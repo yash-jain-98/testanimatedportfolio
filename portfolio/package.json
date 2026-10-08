@@ -1,0 +1,8 @@
+{
+  "name": "animated-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "pages": "npm run package:page && node scripts/export-pages.mjs ../docs", "voice:generate": "python3 scripts/generate-voice.py && npm run package:page", "package:page": "node scripts/package-page.mjs", "predev": "npm run package:page", "dev": "vite --host 0.0.0.0", "prebuild": "npm run package:page", "build": "vite build", "preview": "vite preview --host 0.0.0.0" },
+  "devDependencies": { "vite": "^7.3.1" }
+}
