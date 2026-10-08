@@ -13,5 +13,41 @@ for(const item of experiences){const card=document.createElement('article');card
 el('details').querySelector('.close').onclick=()=>el('details').close();el('details').addEventListener('click',event=>{if(event.target===el('details')){const rect=el('details').getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)el('details').close()}});
 const urls={victoria:'https://www.melbourneboatparties.org/',lady:'https://ladycutler.com.au/',charter:'https://australianboatcharters.com.au/'};el('book').onclick=()=>window.open(urls[el('ship').value],'_blank','noopener');
 el('download').onclick=()=>{const text='MY DAY ON THE WATER\nAustralian Boat Parties · Draft plan\n\n'+[...plan].sort((a,b)=>a.time.localeCompare(b.time)).map(p=>`${p.time}  ${p.name}\n       ${p.where}`).join('\n\n')+'\n\nSample schedule only. This is not a booking or confirmed itinerary. Confirm times and availability with the operator.\nhttps://australianboatparties.com/\n';const blob=new Blob([text],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='my-cruise-plan.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Your draft plan has been downloaded')};
-const reduce=matchMedia('(prefers-reduced-motion: reduce)');let ticking=false;function paint(){const stage=document.querySelector('.stage');const progress=Math.min(1,Math.max(0,scrollY/(innerHeight*.5)));if(!reduce.matches){stage.style.setProperty('--zoom',1.02+progress*.12);stage.style.setProperty('--rise',`${-progress*55}px`);stage.style.setProperty('--fade',1-progress*.6)}ticking=false}addEventListener('scroll',()=>{if(!ticking){requestAnimationFrame(paint);ticking=true}},{passive:true});render();paint();
+const reduce=matchMedia('(prefers-reduced-motion: reduce)');
+const cinema=document.querySelector('.cinema'), stage=document.querySelector('.stage');
+const clamp=(v,min=0,max=1)=>Math.min(max,Math.max(min,v));
+const ease=v=>{v=clamp(v);return v*v*(3-2*v)};
+function cinemaValues(distance){
+ const intro=ease(distance/650),split=ease((distance-560)/700),party=ease((distance-1760)/500),cards=ease((distance-2760)/700);
+ const diningIn=ease((distance-750)/420),diningOut=ease((distance-1630)/300);
+ return {intro,split,party,cards,dining:diningIn*(1-diningOut),partyCopy:ease((distance-1900)/400)*(1-ease((distance-2640)/320)),scene:distance<1050?0:distance<1930?1:distance<2990?2:3};
+}
+let rafPending=false,smoothDistance=0,mouseX=0,mouseY=0,targetX=0,targetY=0;
+const sceneNames=['01 / THE SHIP','02 / STEP INSIDE','03 / AFTER DARK','04 / YOUR NEXT CHAPTER'];
+function paint(){
+ const rect=cinema.getBoundingClientRect(),maxDistance=cinema.offsetHeight-stage.offsetHeight;
+ const target=clamp(-rect.top,0,maxDistance),motion=reduce.matches;
+ smoothDistance=motion?target:smoothDistance+(target-smoothDistance)*.14;
+ mouseX=motion?0:mouseX+(targetX-mouseX)*.08;mouseY=motion?0:mouseY+(targetY-mouseY)*.08;
+ const v=cinemaValues(smoothDistance),set=(key,value)=>stage.style.setProperty(key,String(value));
+ set('--intro',1-v.intro);set('--title-y',`${v.intro*-210}px`);set('--title-scale',1-v.intro*.08);
+ set('--split',v.split);set('--split-x',`${v.split*60}vw`);set('--split-y',`${-v.split*180}px`);set('--split-scale',1+v.split*.55);
+ set('--exterior-opacity',1-ease((smoothDistance-560)/60));set('--split-opacity',1-ease((smoothDistance-1200)/160));
+ set('--dining-opacity',v.dining);set('--party-opacity',v.party);set('--party-copy',v.partyCopy);
+ set('--cards-opacity',v.cards);set('--cards-x',`${Math.pow(1-v.cards,1.55)*120}vw`);
+ set('--scene-scale',1.04+clamp(smoothDistance/3700)*.15);set('--scene-blur',`${v.cards*12}px`);
+ set('--mx',`${mouseX*18}px`);set('--my',`${mouseY*10}px`);
+ const panels=[[document.querySelector('.copy-intro'),1-v.intro],[document.querySelector('.copy-dining'),v.dining],[document.querySelector('.copy-party'),v.partyCopy],[document.querySelector('.cinema-cruises'),v.cards]];
+ for(const [panel,visibility]of panels){panel.inert=visibility<.5;panel.setAttribute('aria-hidden',String(visibility<.5))}
+ el('scene-label').textContent=sceneNames[v.scene];document.querySelectorAll('[data-scene]').forEach((button,i)=>{if(i===v.scene)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current')});
+ rafPending=false;if(Math.abs(target-smoothDistance)>.08||(!motion&&(Math.abs(mouseX-targetX)>.001||Math.abs(mouseY-targetY)>.001)))requestTick();
+}
+function requestTick(){if(!rafPending){rafPending=true;requestAnimationFrame(paint)}}
+addEventListener('scroll',requestTick,{passive:true});addEventListener('resize',requestTick);reduce.addEventListener('change',requestTick);
+addEventListener('pointermove',event=>{if(event.pointerType==='mouse'){targetX=event.clientX/innerWidth-.5;targetY=event.clientY/innerHeight-.5;requestTick()}},{passive:true});
+document.querySelectorAll('[data-scene]').forEach(button=>button.onclick=()=>{const distances=[0,1280,2300,3550];window.scrollTo({top:cinema.getBoundingClientRect().top+scrollY+distances[Number(button.dataset.scene)],behavior:reduce.matches?'instant':'smooth'})});
+const track=document.querySelector('.cinema-track');el('cruise-prev').onclick=()=>track.scrollBy({left:-track.clientWidth*.8,behavior:reduce.matches?'instant':'smooth'});el('cruise-next').onclick=()=>track.scrollBy({left:track.clientWidth*.8,behavior:reduce.matches?'instant':'smooth'});
+document.querySelectorAll('.scene img').forEach(img=>img.addEventListener('error',()=>{img.closest('.scene').classList.add('image-unavailable')}));
+render();requestTick();
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'add_draft_cruise_experience',description:'Add a sample experience to the current unsaved cruise draft. Does not create a booking.',inputSchema:{type:'object',properties:{experienceId:{type:'string',enum:experiences.map(e=>e.id)}},required:['experienceId'],additionalProperties:false},annotations:{readOnlyHint:false},execute:input=>{if(!input||typeof input.experienceId!=='string'||Object.keys(input).some(k=>k!=='experienceId'))throw new Error('Invalid experience input');return add(input.experienceId)}})).catch(()=>{})}catch{}}
+
