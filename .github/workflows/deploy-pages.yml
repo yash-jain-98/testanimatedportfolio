@@ -1,10 +1,11 @@
-name: Deploy cruise website to GitHub Pages
+name: Deploy portfolio to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
-      - 'cruise-website/**'
+      - 'docs/**'
+      - 'portfolio/**'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
@@ -28,10 +29,10 @@ jobs:
         uses: actions/checkout@v6
       - name: Configure Pages
         uses: actions/configure-pages@v5
-      - name: Upload cruise website
+      - name: Upload portfolio
         uses: actions/upload-pages-artifact@v4
         with:
-          path: cruise-website
+          path: docs
       - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4
